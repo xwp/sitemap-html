@@ -1,0 +1,146 @@
+/* Breadcrumbs */
+
+#sitemap-html-breadcrumbs {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	margin: 1rem 0;
+}
+
+#sitemap-html-breadcrumbs:first-child {
+	margin-top: 0;
+}
+
+#sitemap-html-breadcrumbs ol {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1ex;
+	justify-content: center;
+	align-items: center;
+	margin: 0;
+	padding: 0;
+	list-style-type: none;
+}
+
+#sitemap-html-breadcrumbs li {
+	display: inline;
+}
+
+#sitemap-html-breadcrumbs a {
+	font-weight: bold;
+	white-space: nowrap;
+	text-decoration: none;
+}
+
+#sitemap-html-breadcrumbs a:hover,
+#sitemap-html-breadcrumbs a:focus {
+	text-decoration: none;
+}
+
+#sitemap-html-breadcrumbs a:hover span,
+#sitemap-html-breadcrumbs a:focus span {
+	text-decoration: underline;
+}
+
+#sitemap-html-breadcrumbs a::before {
+	font-weight: normal;
+	content: '»';
+	padding-right: 1ex;
+	color: inherit;
+}
+
+#sitemap-html-breadcrumbs li:first-child a {
+	font-weight: normal;
+}
+
+#sitemap-html-breadcrumbs li:first-child a::before {
+	content: none;
+}
+
+/* Sitemap */
+
+#sitemap-html {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	width: 100%;
+	container-type: inline-size;
+}
+
+#sitemap-html ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+/* Sitemap - All Years months */
+
+#sitemap-html .sitemap-html__year {
+	flex: 1 0 9rem;
+	min-width: 9rem;
+	max-width: calc( ( 100% - 4rem ) / 4 );
+}
+
+@container (max-width: 40rem) {
+	#sitemap-html .sitemap-html__year {
+		max-width: calc( (100% - 3rem) / 3 );
+	}
+}
+
+@container (max-width: 30rem) {
+	#sitemap-html .sitemap-html__year {
+		max-width: calc( (100% - 2rem) / 2 );
+	}
+}
+
+@media (max-width: 40rem) {
+	#sitemap-html .sitemap-html__year {
+		max-width: calc( (100% - 3rem) / 3 );
+	}
+}
+
+/* 2 Columns */
+@media (max-width: 30rem) {
+	#sitemap-html .sitemap-html__year {
+		max-width: calc( (100% - 2rem) / 2 );
+	}
+}
+
+/* Sitemap - Month's days */
+
+#sitemap-html .sitemap-html__month {
+	width: 100%;
+}
+
+#sitemap-html .sitemap-html__month ul {
+	display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(9rem, 1fr);
+    grid-template-rows: repeat(auto-fill, minmax(2em, auto));
+    column-gap: 1rem;
+	min-height: 32em;
+}
+
+/* On bigger screens, reduce the height of the month's days, as more columns can be fit. */
+@media ( min-width: 600px ) {
+	#sitemap-html .sitemap-html__month ul {
+		min-height: 17em;
+	}
+}
+
+@container ( min-width: 600px ) {
+	#sitemap-html .sitemap-html__month ul {
+		min-height: 17em;
+	}
+}
+
+#sitemap-html .sitemap-html__month li {
+	line-height: 2em;
+    break-inside: avoid;
+}
+
+/* Sitemap - Day's posts */
+
+#sitemap-html .sitemap-html__day {
+	width: 100%;
+}
