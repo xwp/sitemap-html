@@ -27,7 +27,7 @@ require_once SITEMAP_HTML_PLUGIN_DIR . 'includes/class-plugin.php';
 
 // Initialize the plugin.
 function sitemap_html_init() {
-	$plugin = SitemapHtml\Plugin::get_instance();
+	SitemapHtml\Plugin::get_instance();
 }
 add_action( 'plugins_loaded', 'sitemap_html_init' );
 

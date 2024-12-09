@@ -105,7 +105,7 @@ class Posts {
 		$conditionals = [];
 
 		foreach ( $this->post_types as $post_type ) {
-			$conditionals[] = $this->db->prepare( '%s', $post_type );
+			$conditionals[] = "'" . esc_sql( $post_type ) . "'";
 		}
 
 		return implode( ', ', $conditionals );

@@ -76,6 +76,7 @@ class Plugin {
 		add_shortcode( 'sitemap-html-dated', [ $this, 'render_sitemap_html_shortcode' ] );
 		add_filter( 'the_content', [ $this, 'inject_sitemap_shortcode' ] );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_sitemap_styles' ] );
+		add_action( 'admin_notices', [ $this, 'sitemap_html_admin_notice' ] );
 	}
 
 	/**
@@ -128,27 +129,24 @@ class Plugin {
 	 */
 	public function cache_headers( $headers ) {
 
-		// Don't do anything for the sitemaps index or the month sitemaps.
-		if ( ! $this->is_sitemap() || $this->is_root() || $this->is_month() ) {
+		// Don't do anything for the sitemaps index, the month sitemaps, or the current day or yesterday, as the pages may change
+		if ( ! $this->is_sitemap() || $this->is_root() || $this->is_month() || $this->is_today() || $this->is_yesterday() ) {
 			return $headers;
 		}
 
 		$smaxage = 30 * DAY_IN_SECONDS;
 
-		// Don't do anything for the current day or yesterday, as the page may yet change.
-		if ( ! $this->is_today() && ! $this->is_yesterday() ) {
-			// Add the Cache-Control header if it doesn't exist, with our custom s-maxage.
-			if ( ! array_key_exists( 'Cache-Control', $headers ) ) {
-				$headers['Cache-Control'] = 'max-age=300, stale-while-revalidate, s-maxage=' . $smaxage;
+		// Add the Cache-Control header if it doesn't exist, with our custom s-maxage.
+		if ( ! array_key_exists( 'Cache-Control', $headers ) ) {
+			$headers['Cache-Control'] = 'max-age=300, stale-while-revalidate, s-maxage=' . $smaxage;
 
-				// Replace the existing maxage with our custom s-maxage.
-			} elseif ( strpos( $headers['Cache-Control'], 's-maxage' ) ) {
-				$headers['Cache-Control'] = preg_replace( '/s-maxage=\d+/', 's-maxage=' . $smaxage, $headers['Cache-Control'] );
+			// Replace the existing maxage with our custom s-maxage.
+		} elseif ( strpos( $headers['Cache-Control'], 's-maxage' ) ) {
+			$headers['Cache-Control'] = preg_replace( '/s-maxage=\d+/', 's-maxage=' . $smaxage, $headers['Cache-Control'] );
 
-				// Append our custom s-maxage to the existing header.
-			} else {
-				$headers['Cache-Control'] .= ', s-maxage=' . $smaxage;
-			}
+			// Append our custom s-maxage to the existing header.
+		} else {
+			$headers['Cache-Control'] .= ', s-maxage=' . $smaxage;
 		}
 
 		return $headers;
@@ -726,22 +724,77 @@ class Plugin {
 		// Check if a page with slug 'sitemap' exists.
 		$page = get_page_by_path( 'sitemap' );
 
-		if ( ! $page ) {
-			// Create the page.
-			$page_id = wp_insert_post(
-				[
-					'post_title'   => __( 'Sitemap', 'sitemap-html' ),
-					'post_name'    => 'sitemap',
-					'post_status'  => 'publish',
-					'post_type'    => 'page',
-					'post_content' => '',
-					'post_author'  => get_current_user_id(),
-				]
+		// We have the 'sitemap' page, so we don't need to create it.
+		if ( $page ) {
+			set_transient( 'sitemap_html_activation_notice', __( 'Sitemap HTML Plugin: The page with the "sitemap" slug already exists. The sitemap will be appended to the page available at this URL: <a href="/sitemap" target="_blank">/sitemap</a>.', 'sitemap-html' ), 10 );
+			return;
+		}
+
+		// Create the page.
+		$page_id = wp_insert_post(
+			[
+				'post_title'   => __( 'Sitemap', 'sitemap-html' ),
+				'post_name'    => 'sitemap',
+				'post_status'  => 'publish',
+				'post_type'    => 'page',
+				'post_content' => '',
+				'post_author'  => get_current_user_id(),
+			]
+		);
+
+		if ( is_wp_error( $page_id ) ) {
+			set_transient( 'sitemap_html_activation_error', $page_id->get_error_message(), 10 );
+		} else {
+			set_transient( 'sitemap_html_activation_notice', __( 'Sitemap HTML Plugin: The page with the "sitemap" slug has been created automatically. The sitemap is available at this URL: <a href="/sitemap" target="_blank">/sitemap</a>.', 'sitemap-html' ), 10 );
+		}
+	}
+
+	/**
+	 * Show the activation error notice.
+	 *
+	 * @return void
+	 */
+	public function sitemap_html_admin_notice() {
+		$error_message  = get_transient( 'sitemap_html_activation_error' );
+		$notice_message = get_transient( 'sitemap_html_activation_notice' );
+
+		if ( $error_message ) {
+			// Display the admin notice.
+			printf(
+				'<div class="notice notice-error"><p>%s<br>%s</p></div>',
+				esc_html( __( 'Sitemap HTML Plugin: The page with the "sitemap" slug could not be created during activation, please create it manually. Error message:', 'sitemap-html' ) ),
+				esc_html( $error_message )
 			);
 
-			if ( is_wp_error( $page_id ) ) {
-				wp_die( 'Error creating the sitemap page: ' . esc_html( $page_id->get_error_message() ) );
-			}
+			// Delete the transient to prevent the notice from reappearing.
+			delete_transient( 'sitemap_html_activation_error' );
+		}
+
+		if ( $notice_message ) {
+			// Display the admin notice.
+			printf(
+				'<div class="notice notice-success"><p>%s</p></div>',
+				wp_kses_post( $notice_message )
+			);
+
+			// Delete the transient to prevent the notice from reappearing.
+			delete_transient( 'sitemap_html_activation_error' );
+		}
+	}
+
+	/**
+	 * Enqueue the sitemap stylesheet on the sitemap page.
+	 *
+	 * @return void
+	 */
+	public function enqueue_sitemap_styles() {
+		if ( $this->is_sitemap() ) {
+			wp_enqueue_style(
+				'sitemap-html-style',
+				SITEMAP_HTML_PLUGIN_URL . 'assets/sitemap-html.css',
+				[],
+				SITEMAP_HTML_VERSION ?? '1.0.0'
+			);
 		}
 	}
 
@@ -784,19 +837,53 @@ class Plugin {
 	}
 
 	/**
-	 * Enqueue the sitemap stylesheet on the sitemap page.
+	 * Generate the HTML Sitemap.
 	 *
-	 * @return void
+	 * @param array $links The links to render.
+	 * @param bool  $is_root Whether the sitemap is the root sitemap.
+	 * @param array $breadcrumbs The breadcrumbs to render.
+	 *
+	 * @return string The HTML output of the sitemap.
 	 */
-	public function enqueue_sitemap_styles() {
-		if ( $this->is_sitemap() ) {
-			wp_enqueue_style(
-				'sitemap-html-style',
-				SITEMAP_HTML_PLUGIN_URL . 'assets/sitemap-html.css',
-				[],
-				SITEMAP_HTML_VERSION ?? '1.0.0'
+	public function get_sitemap_html_markup( array $links, bool $is_root, array $breadcrumbs ): string {
+		$output = '';
+
+		if ( ! $is_root ) {
+			$output .= $this->get_breadcrumbs_markup( $breadcrumbs );
+		}
+
+		$output .= '<div id="sitemap-html">';
+
+		foreach ( $links as $section ) {
+			$items = array_map(
+				function ( $item ) {
+					return sprintf(
+						'<li>
+							<a href="%s">%s</a>
+						</li>',
+						esc_url( $item['link'] ),
+						esc_html( $item['label'] )
+					);
+				},
+				$section['items']
+			);
+
+			$output .= sprintf(
+				'<div class="%s">
+					<h2>%s</h2>
+					<ul>
+						%s
+					</ul>
+				</div>',
+				esc_attr( implode( ' ', $section['classes'] ) ),
+				esc_html( $section['label'] ),
+				implode( '', $items )
 			);
 		}
+
+		$output .= '</div>'; // #sitemap-html
+
+		return $output;
 	}
 
 	/**
@@ -805,14 +892,16 @@ class Plugin {
 	 * @return string The HTML output of the sitemap.
 	 */
 	public function render_sitemap_html_shortcode() {
-		// Initialize output
-		$output = '';
-
 		// Determine the context
 		$is_root      = $this->is_root();
 		$is_month     = $this->is_month();
 		$is_day       = $this->is_day();
 		$sitemap_page = get_queried_object();
+
+		// Return early if the page is invalid. Shortcode is only intended to be used on the sitemap page.
+		if ( ! $sitemap_page || ! isset( $sitemap_page->ID ) ) {
+			return '';
+		}
 
 		// Prepare links based on context
 		$links = [];
@@ -879,44 +968,12 @@ class Plugin {
 			];
 		}
 
-		// Generate the HTML
-		if ( ! empty( $links ) ) {
-
-			if ( ! $is_root ) {
-				$output .= $this->get_breadcrumbs_markup( $breadcrumbs );
-			}
-			$output .= '<div id="sitemap-html">';
-
-			foreach ( $links as $section ) {
-				$items = array_map(
-					function ( $item ) {
-						return sprintf(
-							'<li>
-                                <a href="%s">%s</a>
-                            </li>',
-							esc_url( $item['link'] ),
-							esc_html( $item['label'] )
-						);
-					},
-					$section['items']
-				);
-
-				$output .= sprintf(
-					'<div class="%s">
-                        <h2>%s</h2>
-                        <ul>
-                            %s
-                        </ul>
-                    </div>',
-					esc_attr( implode( ' ', $section['classes'] ) ),
-					esc_html( $section['label'] ),
-					implode( '', $items )
-				);
-			}
-
-			$output .= '</div>'; // .c-sitemap
+		// Return early if there are no links to render.
+		if ( empty( $links ) ) {
+			return '<p>' . esc_html__( 'No posts found.', 'sitemap-html' ) . '</p>';
 		}
 
-		return $output;
+		// Generate the HTML
+		return $this->get_sitemap_html_markup( $links, $is_root, $breadcrumbs );
 	}
 }
